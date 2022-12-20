@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect } from 'react'
-import { Component, Div } from './flags'
+import { Component, Div, Span } from './flags'
 import source_image_file from './image.jpeg'
 
 const patterns_ids = [...Array(48).keys()].map((index) => index + 1)
@@ -7,7 +7,7 @@ const patterns_ids = [...Array(48).keys()].map((index) => index + 1)
 export const Home = ({ is_selected }) => {
   const [canvas, set_canvas] = useState(null)
   const [context, set_context] = useState(null)
-  const [source_image, set_source_image] = useState(source_image_file)
+  const [source_image, set_source_image] = useState()
   const [patterns_lines, set_patterns_lines] = useState([])
 
   // customizable input parameters
@@ -67,68 +67,80 @@ export const Home = ({ is_selected }) => {
     load_image(source_image_file)
   }, [context, patterns_per_line, source_image, canvas])
 
-  const canvas_width = patterns_per_line * pattern_size
-  const is_oversized = canvas_width > window.innerWidth
+  // when the user arrives on the app, no image is loaded yet:
+  // a file input is displayed to updload one
+  if (!source_image) {
+    return (
+      <UploadLabel>
+        <UploadLabelButton fs30 b_rad100 pv20 ph40 bw2>
+          Hello hello! To get started, click & import an image...
+        </UploadLabelButton>
+        <UploadInput
+          type="file"
+          onChange={(event) => {
+            const reader = new FileReader()
+            reader.onload = (event) => set_source_image(event.target.result)
+            reader.readAsDataURL(event.target.files[0])
+          }}
+        />
+      </UploadLabel>
+    )
+  }
 
   return (
     <Fragment>
       <Canvas none elemRef={set_canvas} width="0" height="0" />
 
       <Settings
-        patterns_per_line={patterns_per_line}
-        set_patterns_per_line={set_patterns_per_line}
-        pattern_size={pattern_size}
-        set_pattern_size={set_pattern_size}
-        source_image={source_image}
-        set_source_image={set_source_image}
-        saturation={saturation}
-        set_saturation={set_saturation}
-        hue={hue}
-        set_hue={set_hue}
+        settings={{
+          patterns_per_line,
+          pattern_size,
+          source_image,
+          saturation,
+          hue,
+          set_patterns_per_line,
+          set_pattern_size,
+          set_source_image,
+          set_saturation,
+          set_hue,
+        }}
       />
 
-      <Render ai_center={!is_oversized} jc_center={!is_oversized}>
-        <PatternsImage
-          style={{
-            lineHeight: '7px',
-            filter: `saturate(${saturation}%) hue-rotate(${hue}deg)`,
-          }}
-        >
-          {patterns_lines.map((line, index) => (
-            <PatternsLine key={index}>
-              {line.map((pattern, index) => (
-                <Pattern
-                  key={index}
-                  style={{
-                    width: `${pattern_size}px`,
-                    height: `${pattern_size}px`,
-                    filter: `brightness(${
-                      (pattern / patterns_ids.length) * 150 + 20
-                    }%)`,
-                    background: `center / cover url('./images/image-${pattern}.jpeg')`,
-                  }}
-                />
-              ))}
-            </PatternsLine>
-          ))}
-        </PatternsImage>
-      </Render>
+      <Render
+        patterns_lines={patterns_lines}
+        settings={{ patterns_per_line, pattern_size, saturation, hue }}
+      />
     </Fragment>
   )
 }
 
-const Settings = ({
-  patterns_per_line,
-  set_patterns_per_line,
-  pattern_size,
-  set_pattern_size,
-  source_image,
-  set_source_image,
-  saturation,
-  set_saturation,
-  hue,
-  set_hue,
-}) => {
+const Render = ({ patterns_lines, settings }) => {
+  const { patterns_per_line, pattern_size, saturation, hue } = settings
+  const canvas_width = patterns_per_line * pattern_size
+  const is_oversized = canvas_width > window.innerWidth
+  const image_filter = `saturate(${saturation}%) hue-rotate(${hue}deg)`
+  const size = pattern_size
+
+  return (
+    <PatternsWrapper ai_center={!is_oversized} jc_center={!is_oversized}>
+      <PatternsImage style={{ filter: image_filter }}>
+        {patterns_lines.map((patterns_line, index) => (
+          <PatternsLine key={index}>
+            {patterns_line.map((pattern_id, index) => {
+              const background = `center / cover url('./images/image-${pattern_id}.jpeg')`
+              const brightness = (pattern_id / patterns_ids.length) * 150 + 20
+              const filter = `brightness(${brightness}%)`
+              const style = { width: size, height: size, filter, background }
+              return <Pattern key={index} style={style} />
+            })}
+          </PatternsLine>
+        ))}
+      </PatternsImage>
+    </PatternsWrapper>
+  )
+}
+
+const Settings = ({ settings }) => {
   const [is_open, set_is_open] = useState(true)
 
   return (
@@ -137,101 +149,78 @@ const Settings = ({
         <div>Settings</div>
         <Div ml25>{is_open ? '↑' : '↓'}</Div>
       </Header>
-
       {is_open && (
         <Fragment>
           <Setting
-            label="Patterns per line"
-            value={patterns_per_line}
-            set_value={(value) =>
-              value < 300 && set_patterns_per_line(Number(value))
-            }
+            min={10}
+            max={200}
+            value={settings.patterns_per_line}
+            set_value={settings.set_patterns_per_line}
+            label={{ text: 'Patterns p/ line' }}
           />
           <Setting
-            label="Pattern size in px"
-            value={pattern_size}
-            set_value={(value) =>
-              value < 100 && set_pattern_size(Number(value))
-            }
+            min={3}
+            max={75}
+            value={settings.pattern_size}
+            set_value={settings.set_pattern_size}
+            label={{ text: 'Pattern size', unit: 'px' }}
           />
           <Setting
             min={0}
             max={2000}
-            type="range"
-            label={`Saturation ${saturation}%`}
-            value={saturation}
-            set_value={({ target }) => set_saturation(Number(target.value))}
+            value={settings.saturation}
+            set_value={settings.set_saturation}
+            label={{ text: 'Saturation', unit: '%' }}
           />
           <Setting
             min={0}
             max={360}
-            type="range"
-            label={`Hue ${hue}°`}
-            value={hue}
-            set_value={({ target }) => set_hue(Number(target.value))}
+            value={settings.hue}
+            set_value={settings.set_hue}
+            label={{ text: 'Hue', unit: '°' }}
           />
 
-          <SourceImage>
-            <UploadedImage src={source_image}></UploadedImage>
-            <Label>
-              <LabelText>Import your image</LabelText>
+          <ImageUpload>
+            <SourceImage src={settings.source_image}></SourceImage>
+            <UploadLabel>
+              <UploadLabelButton>Try with another image!</UploadLabelButton>
               <UploadInput
                 type="file"
-                onChange={(event) => {
+                onChange={({ target }) => {
                   const reader = new FileReader()
-                  reader.onload = (event) =>
-                    set_source_image(event.target.result)
-                  reader.readAsDataURL(event.target.files[0])
+                  reader.onload = ({ target }) => {
+                    settings.set_source_image(target.result)
+                  }
+                  reader.readAsDataURL(target.files[0])
                 }}
               />
-            </Label>
-          </SourceImage>
+            </UploadLabel>
+          </ImageUpload>
         </Fragment>
       )}
     </Controls>
   )
 }
 
-const Setting = ({ type, value, set_value, label, ...props }) => {
-  const [input_value, set_input_value] = useState(value)
-  const has_typed = value.toString() !== input_value.toString()
-
-  const save_on_enter = ({ key }) => key === 'Enter' && set_value(input_value)
-  const save_on_click = () => has_typed && set_value(input_value)
-  const handle_change = ({ target }) => set_input_value(target.value)
-
+const Setting = ({ value, set_value, label, ...props }) => {
   return (
-    <Parameter onKeyDown={save_on_enter}>
-      <Div flex ai_center>
-        {type === 'range' ? (
-          <RangeInput
-            type="range"
-            defaultValue={value}
-            onInput={set_value}
-            {...props}
-          />
-        ) : (
-          <Fragment>
-            <Input type="number" defaultValue={value} onInput={handle_change} />
-            <Button
-              o50={!has_typed}
-              c_pointer={has_typed}
-              onClick={save_on_click}
-            >
-              OK
-            </Button>
-          </Fragment>
-        )}
-        {label}
-      </Div>
+    <Parameter>
+      <RangeInput
+        type="range"
+        defaultValue={value}
+        onInput={({ target }) => set_value(Number(target.value))}
+        {...props}
+      />
+      <Span grey5 mr5>
+        {label.text}:
+      </Span>
+      <Span mr2>{value}</Span>
+      {label.unit}
     </Parameter>
   )
 }
 
-const Render = Component.flex.w100vw.min_h100vh.div()
 const Canvas = Component.canvas()
-const Button =
-  Component.ml5.mr10.ls1.hover_shadow.b_rad10.h20.bg_white.ba.fs11.ph10.mono.button()
 
 // control panel
 const Controls =
@@ -239,16 +228,17 @@ const Controls =
 const Header =
   Component.c_pointer.fs13.uppercase.ls3.grey5.flex.jc_between.w100p.div()
 const Parameter = Component.w100p.fs14.mt10.flex.ai_center.div()
-const Input = Component.pa0.b_rad20.ba.h20.w65.text_center.input()
-const RangeInput = Component.w110.mr10.input()
-const Label =
+const RangeInput = Component.w105.mr15.input()
+const UploadLabel =
   Component.black.fs15.w100p.h100p.absolute.flex.ai_center.jc_center.label()
-const LabelText = Component.ba.b_rad20.b_black.bg_white.bw1.ph25.pv5.span()
-const SourceImage = Component.mt30.relative.flex.ai_center.jc_center.div()
-const UploadedImage = Component.w100p.img()
+const UploadLabelButton =
+  Component.ba.b_rad20.b_black.bg_white.bw1.ph25.pv5.span()
+const ImageUpload = Component.w100p.mt30.relative.flex.ai_center.jc_center.div()
 const UploadInput = Component.o0.w100p.h100p.absolute.c_pointer.input()
+const SourceImage = Component.w100p.min_h100.ba.b_black.img()
 
 // render
+const PatternsWrapper = Component.flex.w100vw.min_h100vh.div()
 const PatternsImage = Component.fs8.mono.ws_nowrap.div()
 const PatternsLine = Component.flex.ai_center.div()
 const Pattern =

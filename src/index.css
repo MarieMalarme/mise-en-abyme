@@ -10,7 +10,6 @@
 
 input[type='range'] {
   -webkit-appearance: none;
-  width: 112px;
   height: 1.5px;
   cursor: pointer;
   background: black;
