@@ -154,35 +154,27 @@ const Settings = ({
               value < 100 && set_pattern_size(Number(value))
             }
           />
-
-          <Div mt10 flex ai_center>
-            <InputRange
-              min={0}
-              max={2000}
-              type="range"
-              defaultValue={saturation}
-              onInput={(event) => set_saturation(Number(event.target.value))}
-            />
-            <label style={{ fontSize: '14px' }}>Saturation {saturation}%</label>
-          </Div>
-
-          <Div mt10 flex ai_center>
-            <InputRange
-              min={0}
-              max={2000}
-              type="range"
-              defaultValue={hue}
-              onInput={(event) => set_hue(Number(event.target.value))}
-            />
-            <label style={{ fontSize: '14px' }}>Hue {hue}°</label>
-          </Div>
-
-          {/* add filters / blend modes */}
+          <Setting
+            min={0}
+            max={2000}
+            type="range"
+            label={`Saturation ${saturation}%`}
+            value={saturation}
+            set_value={({ target }) => set_saturation(Number(target.value))}
+          />
+          <Setting
+            min={0}
+            max={360}
+            type="range"
+            label={`Hue ${hue}°`}
+            value={hue}
+            set_value={({ target }) => set_hue(Number(target.value))}
+          />
 
           <SourceImage>
             <UploadedImage src={source_image}></UploadedImage>
             <Label>
-              <LabelText>Import image</LabelText>
+              <LabelText>Import your image</LabelText>
               <UploadInput
                 type="file"
                 onChange={(event) => {
@@ -200,7 +192,7 @@ const Settings = ({
   )
 }
 
-const Setting = ({ value, set_value, label }) => {
+const Setting = ({ type, value, set_value, label, ...props }) => {
   const [input_value, set_input_value] = useState(value)
   const has_typed = value.toString() !== input_value.toString()
 
@@ -211,10 +203,25 @@ const Setting = ({ value, set_value, label }) => {
   return (
     <Parameter onKeyDown={save_on_enter}>
       <Div flex ai_center>
-        <Input type="number" defaultValue={value} onInput={handle_change} />
-        <Button o50={!has_typed} c_pointer={has_typed} onClick={save_on_click}>
-          OK
-        </Button>
+        {type === 'range' ? (
+          <RangeInput
+            type="range"
+            defaultValue={value}
+            onInput={set_value}
+            {...props}
+          />
+        ) : (
+          <Fragment>
+            <Input type="number" defaultValue={value} onInput={handle_change} />
+            <Button
+              o50={!has_typed}
+              c_pointer={has_typed}
+              onClick={save_on_click}
+            >
+              OK
+            </Button>
+          </Fragment>
+        )}
         {label}
       </Div>
     </Parameter>
@@ -231,12 +238,12 @@ const Controls =
   Component.fixed.flex.flex_column.ai_flex_start.zi10.t30.l30.bg_white.pa20.ba.b_rad10.div()
 const Header =
   Component.c_pointer.fs13.uppercase.ls3.grey5.flex.jc_between.w100p.div()
-const Parameter = Component.w100p.fs14.mt10.flex.ai_center.jc_between.div()
+const Parameter = Component.w100p.fs14.mt10.flex.ai_center.div()
 const Input = Component.pa0.b_rad20.ba.h20.w65.text_center.input()
-const InputRange = Component.w110.mr10.input()
+const RangeInput = Component.w110.mr10.input()
 const Label =
-  Component.blend_difference.white.fs25.w100p.h100p.absolute.flex.ai_center.jc_center.label()
-const LabelText = Component.ba.b_rad20.b_white.bw2.ph25.pv5.span()
+  Component.black.fs15.w100p.h100p.absolute.flex.ai_center.jc_center.label()
+const LabelText = Component.ba.b_rad20.b_black.bg_white.bw1.ph25.pv5.span()
 const SourceImage = Component.mt30.relative.flex.ai_center.jc_center.div()
 const UploadedImage = Component.w100p.img()
 const UploadInput = Component.o0.w100p.h100p.absolute.c_pointer.input()

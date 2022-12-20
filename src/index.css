@@ -7,3 +7,21 @@
 ::-webkit-scrollbar {
   display: none;
 }
+
+input[type='range'] {
+  -webkit-appearance: none;
+  width: 112px;
+  height: 1.5px;
+  cursor: pointer;
+  background: black;
+  border-radius: 5px;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: white;
+  border-radius: 50%;
+  border: solid 1px black;
+}
