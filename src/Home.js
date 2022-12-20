@@ -13,6 +13,7 @@ export const Home = ({ is_selected }) => {
   // customizable input parameters
   const [patterns_per_line, set_patterns_per_line] = useState(50)
   const [pattern_size, set_pattern_size] = useState(10)
+  const [saturation, set_saturation] = useState(200)
 
   useEffect(() => {
     if (!canvas) return
@@ -79,10 +80,14 @@ export const Home = ({ is_selected }) => {
         set_pattern_size={set_pattern_size}
         source_image={source_image}
         set_source_image={set_source_image}
+        saturation={saturation}
+        set_saturation={set_saturation}
       />
 
       <Render ai_center={!is_oversized} jc_center={!is_oversized}>
-        <PatternsImage style={{ lineHeight: '7px', filter: 'saturate(200%)' }}>
+        <PatternsImage
+          style={{ lineHeight: '7px', filter: `saturate(${saturation}%)` }}
+        >
           {patterns_lines.map((line, index) => (
             <PatternsLine key={index}>
               {line.map((pattern, index) => (
@@ -113,6 +118,8 @@ const Settings = ({
   set_pattern_size,
   source_image,
   set_source_image,
+  saturation,
+  set_saturation,
 }) => {
   const [is_open, set_is_open] = useState(true)
 
@@ -139,6 +146,17 @@ const Settings = ({
               value < 100 && set_pattern_size(Number(value))
             }
           />
+
+          <Div mt10 flex ai_center>
+            <InputRange
+              min={0}
+              max={2000}
+              type="range"
+              defaultValue={saturation}
+              onInput={(event) => set_saturation(Number(event.target.value))}
+            />
+            <label style={{ fontSize: '14px' }}>Saturation {saturation}%</label>
+          </Div>
 
           {/* add filters / blend modes */}
 
@@ -196,6 +214,7 @@ const Header =
   Component.c_pointer.fs13.uppercase.ls3.grey5.flex.jc_between.w100p.div()
 const Parameter = Component.w100p.fs14.mt10.flex.ai_center.jc_between.div()
 const Input = Component.pa0.b_rad20.ba.h20.w65.text_center.input()
+const InputRange = Component.w110.mr10.input()
 const Label =
   Component.blend_difference.white.fs25.w100p.h100p.absolute.flex.ai_center.jc_center.label()
 const LabelText = Component.ba.b_rad20.b_white.bw2.ph25.pv5.span()
