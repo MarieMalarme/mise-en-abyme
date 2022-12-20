@@ -14,6 +14,7 @@ export const Home = ({ is_selected }) => {
   const [patterns_per_line, set_patterns_per_line] = useState(50)
   const [pattern_size, set_pattern_size] = useState(10)
   const [saturation, set_saturation] = useState(200)
+  const [hue, set_hue] = useState(0)
 
   useEffect(() => {
     if (!canvas) return
@@ -82,11 +83,16 @@ export const Home = ({ is_selected }) => {
         set_source_image={set_source_image}
         saturation={saturation}
         set_saturation={set_saturation}
+        hue={hue}
+        set_hue={set_hue}
       />
 
       <Render ai_center={!is_oversized} jc_center={!is_oversized}>
         <PatternsImage
-          style={{ lineHeight: '7px', filter: `saturate(${saturation}%)` }}
+          style={{
+            lineHeight: '7px',
+            filter: `saturate(${saturation}%) hue-rotate(${hue}deg)`,
+          }}
         >
           {patterns_lines.map((line, index) => (
             <PatternsLine key={index}>
@@ -120,6 +126,8 @@ const Settings = ({
   set_source_image,
   saturation,
   set_saturation,
+  hue,
+  set_hue,
 }) => {
   const [is_open, set_is_open] = useState(true)
 
@@ -156,6 +164,17 @@ const Settings = ({
               onInput={(event) => set_saturation(Number(event.target.value))}
             />
             <label style={{ fontSize: '14px' }}>Saturation {saturation}%</label>
+          </Div>
+
+          <Div mt10 flex ai_center>
+            <InputRange
+              min={0}
+              max={2000}
+              type="range"
+              defaultValue={hue}
+              onInput={(event) => set_hue(Number(event.target.value))}
+            />
+            <label style={{ fontSize: '14px' }}>Hue {hue}°</label>
           </Div>
 
           {/* add filters / blend modes */}
