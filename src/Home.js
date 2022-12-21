@@ -1,20 +1,32 @@
 import { Fragment, useState, useEffect } from 'react'
 import { Component, Div, Span } from './flags'
-import source_image_file from './image.jpeg'
 
-const patterns_ids = [...Array(48).keys()].map((index) => index + 1)
+const images_ids = [...Array(48).keys()].map((index) => index + 1)
+const images = []
+
+images_ids.forEach((image_id) => {
+  const img = new Image()
+  img.onload = () => {
+    images.push(img)
+  }
+  img.src = `./images/image-${image_id}.jpeg`
+})
 
 export const Home = ({ is_selected }) => {
   const [canvas, set_canvas] = useState(null)
   const [context, set_context] = useState(null)
   const [source_image, set_source_image] = useState()
-  const [patterns_lines, set_patterns_lines] = useState([])
 
   // customizable input parameters
   const [patterns_per_line, set_patterns_per_line] = useState(50)
   const [pattern_size, set_pattern_size] = useState(10)
   const [saturation, set_saturation] = useState(200)
+  const [brightness, set_brightness] = useState(100)
+  const [invert, set_invert] = useState(0)
   const [hue, set_hue] = useState(0)
+
+  const canvas_width = patterns_per_line * pattern_size
+  const is_oversized = canvas_width > window.innerWidth
 
   useEffect(() => {
     if (!canvas) return
@@ -25,47 +37,64 @@ export const Home = ({ is_selected }) => {
   useEffect(() => {
     if (!context) return
 
-    const load_image = () => {
+    const render_image = () => {
       const img = new Image()
       img.onload = () => {
+        // draw the source image to get its pixels data
         const ratio = img.height / img.width
         const target_width = patterns_per_line
         const target_height = Math.floor(target_width * ratio)
         const img_dimensions = [0, 0, img.width, img.height]
         const target_dimensions = [0, 0, target_width, target_height]
-
         canvas.width = target_width
         canvas.height = target_height
-
         context.drawImage(img, ...img_dimensions, ...target_dimensions)
         const pixels = context.getImageData(...target_dimensions).data
 
+        // match an image pattern to each pixel according to its greyscale value
         let patterns = []
         const chunk_size = 4
         for (let i = 0; i < pixels.length; i += chunk_size) {
           const [red, green, blue] = pixels.slice(i, i + chunk_size)
           const grey = Math.floor((red + green + blue) / 3)
-          const index = Math.floor(grey / (255 / patterns_ids.length))
-          const matching_pattern = patterns_ids.at(index)
+          const index = Math.floor(grey / (255 / images_ids.length)) - 1
+          const matching_pattern = images.at(index)
           patterns.push(matching_pattern)
         }
 
-        let lines = []
+        // set canvas size to fit the render parameters
+        canvas.width = pattern_size * patterns_per_line
+        canvas.height = pattern_size * (patterns.length / patterns_per_line)
+
+        // clear the source image
+        context.clearRect(0, 0, canvas.width, canvas.height)
+
+        // draw the patterned image with image pool images on the render
+        // 1. per each line of the image
         for (let i = 0; i < patterns.length; i += patterns_per_line) {
-          lines.push(patterns.slice(i, i + patterns_per_line))
+          const line = patterns.slice(i, i + patterns_per_line)
+          const line_index = i / patterns_per_line
+
+          // 2. per each pattern of the line
+          for (const [pattern_index, pattern] of line.entries()) {
+            // find matching image from the preloaded images array
+            const x = pattern_index * pattern_size
+            const y = line_index * pattern_size
+            const width = pattern_size
+            const height = pattern_size
+            context.drawImage(pattern, x, y, width, height)
+          }
         }
 
-        set_patterns_lines(lines)
-
-        // draw pattern image on canvas rather than on html
-
-        // add feature to download final render
+        // add feature to download final render (apply filters and redraw before downloading)
+        // context.filter = `saturate(${saturation}%) hue-rotate(${hue}deg) invert(${invert}%) brightness(${brightness}%)`
+        // context.drawImage(canvas, 0, 0)
       }
       img.src = source_image
     }
 
-    load_image(source_image_file)
-  }, [context, patterns_per_line, source_image, canvas])
+    render_image()
+  }, [context, patterns_per_line, pattern_size, source_image, canvas])
 
   // when the user arrives on the app, no image is loaded yet:
   // a file input is displayed to updload one
@@ -88,8 +117,13 @@ export const Home = ({ is_selected }) => {
   }
 
   return (
-    <Fragment>
-      <Canvas none elemRef={set_canvas} width="0" height="0" />
+    <Wrapper ai_center={!is_oversized} jc_center={!is_oversized}>
+      <Canvas
+        style={{
+          filter: `saturate(${saturation}%) hue-rotate(${hue}deg) invert(${invert}%) brightness(${brightness}%)`,
+        }}
+        elemRef={set_canvas}
+      />
 
       <Settings
         settings={{
@@ -97,46 +131,19 @@ export const Home = ({ is_selected }) => {
           pattern_size,
           source_image,
           saturation,
+          brightness,
+          invert,
           hue,
           set_patterns_per_line,
           set_pattern_size,
           set_source_image,
           set_saturation,
+          set_brightness,
+          set_invert,
           set_hue,
         }}
       />
-
-      <Render
-        patterns_lines={patterns_lines}
-        settings={{ patterns_per_line, pattern_size, saturation, hue }}
-      />
-    </Fragment>
-  )
-}
-
-const Render = ({ patterns_lines, settings }) => {
-  const { patterns_per_line, pattern_size, saturation, hue } = settings
-  const canvas_width = patterns_per_line * pattern_size
-  const is_oversized = canvas_width > window.innerWidth
-  const image_filter = `saturate(${saturation}%) hue-rotate(${hue}deg)`
-  const size = pattern_size
-
-  return (
-    <PatternsWrapper ai_center={!is_oversized} jc_center={!is_oversized}>
-      <PatternsImage style={{ filter: image_filter }}>
-        {patterns_lines.map((patterns_line, index) => (
-          <PatternsLine key={index}>
-            {patterns_line.map((pattern_id, index) => {
-              const background = `center / cover url('./images/image-${pattern_id}.jpeg')`
-              const brightness = (pattern_id / patterns_ids.length) * 150 + 20
-              const filter = `brightness(${brightness}%)`
-              const style = { width: size, height: size, filter, background }
-              return <Pattern key={index} style={style} />
-            })}
-          </PatternsLine>
-        ))}
-      </PatternsImage>
-    </PatternsWrapper>
+    </Wrapper>
   )
 }
 
@@ -153,13 +160,13 @@ const Settings = ({ settings }) => {
         <Fragment>
           <Setting
             min={10}
-            max={200}
+            max={300}
             value={settings.patterns_per_line}
             set_value={settings.set_patterns_per_line}
             label={{ text: 'Patterns p/ line' }}
           />
           <Setting
-            min={3}
+            min={1}
             max={75}
             value={settings.pattern_size}
             set_value={settings.set_pattern_size}
@@ -171,6 +178,20 @@ const Settings = ({ settings }) => {
             value={settings.saturation}
             set_value={settings.set_saturation}
             label={{ text: 'Saturation', unit: '%' }}
+          />
+          <Setting
+            min={25}
+            max={300}
+            value={settings.brightness}
+            set_value={settings.set_brightness}
+            label={{ text: 'Brightness', unit: '%' }}
+          />
+          <Setting
+            min={0}
+            max={100}
+            value={settings.invert}
+            set_value={settings.set_invert}
+            label={{ text: 'Invert', unit: '%' }}
           />
           <Setting
             min={0}
@@ -220,8 +241,6 @@ const Setting = ({ value, set_value, label, ...props }) => {
   )
 }
 
-const Canvas = Component.canvas()
-
 // control panel
 const Controls =
   Component.fixed.flex.flex_column.ai_flex_start.zi10.t30.l30.bg_white.pa20.ba.b_rad10.div()
@@ -238,10 +257,7 @@ const UploadInput = Component.o0.w100p.h100p.absolute.c_pointer.input()
 const SourceImage = Component.w100p.min_h100.ba.b_black.img()
 
 // render
-const PatternsWrapper = Component.flex.w100vw.min_h100vh.div()
-const PatternsImage = Component.fs8.mono.ws_nowrap.div()
-const PatternsLine = Component.flex.ai_center.div()
-const Pattern =
-  Component.w10.h10.flex_shrink0.flex.ai_center.jc_center.text_center.span()
+const Wrapper = Component.flex.w100vw.min_h100vh.div()
+const Canvas = Component.canvas()
 
 export default Home
