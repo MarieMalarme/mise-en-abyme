@@ -16,6 +16,7 @@ export const Home = ({ is_selected }) => {
   const [canvas, set_canvas] = useState(null)
   const [context, set_context] = useState(null)
   const [source_image, set_source_image] = useState()
+  const [inc_index, set_inc_index] = useState(0)
 
   // customizable input parameters
   const [patterns_per_line, set_patterns_per_line] = useState(50)
@@ -27,6 +28,7 @@ export const Home = ({ is_selected }) => {
 
   const canvas_width = patterns_per_line * pattern_size
   const is_oversized = canvas_width > window.innerWidth
+  const canvas_filter = `saturate(${saturation}%) hue-rotate(${hue}deg) invert(${invert}%) brightness(${brightness}%)`
 
   useEffect(() => {
     if (!canvas) return
@@ -51,6 +53,12 @@ export const Home = ({ is_selected }) => {
         context.drawImage(img, ...img_dimensions, ...target_dimensions)
         const pixels = context.getImageData(...target_dimensions).data
 
+        // shuffle the images if the user hovered the shuffling stripe
+        const shuffled_images = [
+          ...images.slice(inc_index, images.length),
+          ...images.slice(0, inc_index),
+        ]
+
         // match an image pattern to each pixel according to its greyscale value
         let patterns = []
         const chunk_size = 4
@@ -58,7 +66,7 @@ export const Home = ({ is_selected }) => {
           const [red, green, blue] = pixels.slice(i, i + chunk_size)
           const grey = Math.floor((red + green + blue) / 3)
           const index = Math.floor(grey / (255 / images_ids.length)) - 1
-          const matching_pattern = images.at(index)
+          const matching_pattern = shuffled_images.at(index)
           patterns.push(matching_pattern)
         }
 
@@ -87,14 +95,21 @@ export const Home = ({ is_selected }) => {
         }
 
         // add feature to download final render (apply filters and redraw before downloading)
-        // context.filter = `saturate(${saturation}%) hue-rotate(${hue}deg) invert(${invert}%) brightness(${brightness}%)`
+        // context.filter = canvas_filter
         // context.drawImage(canvas, 0, 0)
       }
       img.src = source_image
     }
 
     render_image()
-  }, [context, patterns_per_line, pattern_size, source_image, canvas])
+  }, [
+    canvas,
+    context,
+    patterns_per_line,
+    pattern_size,
+    source_image,
+    inc_index,
+  ])
 
   // when the user arrives on the app, no image is loaded yet:
   // a file input is displayed to updload one
@@ -118,12 +133,7 @@ export const Home = ({ is_selected }) => {
 
   return (
     <Wrapper ai_center={!is_oversized} jc_center={!is_oversized}>
-      <Canvas
-        style={{
-          filter: `saturate(${saturation}%) hue-rotate(${hue}deg) invert(${invert}%) brightness(${brightness}%)`,
-        }}
-        elemRef={set_canvas}
-      />
+      <Canvas style={{ filter: canvas_filter }} elemRef={set_canvas} />
 
       <Settings
         settings={{
@@ -143,6 +153,8 @@ export const Home = ({ is_selected }) => {
           set_hue,
         }}
       />
+
+      <ShufflingStripe inc_index={inc_index} set_inc_index={set_inc_index} />
     </Wrapper>
   )
 }
@@ -241,6 +253,35 @@ const Setting = ({ value, set_value, label, ...props }) => {
   )
 }
 
+const ShufflingStripe = ({ inc_index, set_inc_index }) => (
+  <ShufflingWrapper>
+    <ShufflingLabel>Shuffling-patterns stripe</ShufflingLabel>
+    <ShufflingFrames
+      style={{
+        gridTemplateColumns: `repeat(${images.length}, 1fr)`,
+        background: 'linear-gradient(transparent, white 85%)',
+      }}
+    >
+      {images.map((image, index) => {
+        const is_selected = inc_index === index
+        return (
+          <ShufflingFrame
+            key={index}
+            fs15={is_selected}
+            grey5={!is_selected}
+            onMouseOver={(event) => set_inc_index(index)}
+          >
+            {is_selected && <Dot />}
+            <Span mb10={!is_selected} mb8={is_selected}>
+              {index + 1}
+            </Span>
+          </ShufflingFrame>
+        )
+      })}
+    </ShufflingFrames>
+  </ShufflingWrapper>
+)
+
 // control panel
 const Controls =
   Component.fixed.flex.flex_column.ai_flex_start.zi10.t30.l30.bg_white.pa20.ba.b_rad10.div()
@@ -255,6 +296,16 @@ const UploadLabelButton =
 const ImageUpload = Component.w100p.mt30.relative.flex.ai_center.jc_center.div()
 const UploadInput = Component.o0.w100p.h100p.absolute.c_pointer.input()
 const SourceImage = Component.w100p.min_h100.ba.b_black.img()
+
+// shuffling stripe
+const ShufflingWrapper = Component.w100p.fixed.b0.div()
+const ShufflingLabel =
+  Component.pv5.ph10.bg_white.b_rad20.ba.ml30.fs14.grey6.span()
+const ShufflingFrames =
+  Component.mt30.c_pointer.grid.h60.w100p.text_center.div()
+const ShufflingFrame =
+  Component.h100p.w100p.br.fs10.flex.flex_column.ai_center.jc_flex_end.div()
+const Dot = Component.mb15.h7.w7.bg_black.b_rad50p.div()
 
 // render
 const Wrapper = Component.flex.w100vw.min_h100vh.div()
