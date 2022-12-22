@@ -13,13 +13,18 @@ images_ids.forEach((image_id) => {
 })
 
 export const Home = ({ is_selected }) => {
+  // canvases references
   const [canvas, set_canvas] = useState(null)
   const [context, set_context] = useState(null)
   const [export_canvas, set_export_canvas] = useState(null)
   const [export_context, set_export_context] = useState(null)
 
+  // image render parameters
   const [source_image, set_source_image] = useState()
   const [inc_index, set_inc_index] = useState(0)
+
+  // states
+  const [loading, set_loading] = useState(false)
 
   // customizable input parameters
   const [patterns_per_line, set_patterns_per_line] = useState(50)
@@ -164,11 +169,13 @@ export const Home = ({ is_selected }) => {
       <ShufflingStripe inc_index={inc_index} set_inc_index={set_inc_index} />
 
       <Downloads
-        canvases={{ canvas, export_canvas }}
-        export_context={export_context}
+        canvases={{ canvas, export_canvas, export_context }}
         render_canvas={render_canvas}
+        set_loading={set_loading}
         filter={canvas_filter}
       />
+
+      {loading && <Loader>Rendering video</Loader>}
     </Wrapper>
   )
 }
@@ -296,8 +303,8 @@ const ShufflingStripe = ({ inc_index, set_inc_index }) => (
   </ShufflingWrapper>
 )
 
-const Downloads = ({ canvases, export_context, render_canvas, filter }) => {
-  const { canvas, export_canvas } = canvases
+const Downloads = ({ canvases, render_canvas, filter, set_loading }) => {
+  const { canvas, export_canvas, export_context } = canvases
   return (
     <DownloadButtons>
       <DownloadButton
@@ -348,6 +355,7 @@ const Downloads = ({ canvases, export_context, render_canvas, filter }) => {
           // start recording
           recorder.start()
           animate_canvas()
+          set_loading(true)
           // store new data made available by the recorder
           recorder.ondataavailable = ({ data }) => media_chunks.push(data)
           // once the recorder stops, make a complete blob from all the chunks
@@ -358,6 +366,8 @@ const Downloads = ({ canvases, export_context, render_canvas, filter }) => {
             link.download = 'canvas-animated'
             link.click()
             link.remove()
+
+            set_loading(false)
           }
         }}
       >
@@ -400,5 +410,7 @@ const ExportCanvas = Component.fixed.t0.canvas()
 // downloads
 const DownloadButtons = Component.fixed.t30.r30.flex.flex_column.div()
 const DownloadButton = Component.bg_white.ba.ph15.pv5.b_rad20.fs14.mb10.button()
+const Loader =
+  Component.fixed.bg_white.fs20.ph20.pv10.ba.b_rad100.shadow_a_l.div()
 
 export default Home
