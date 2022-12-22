@@ -15,6 +15,9 @@ images_ids.forEach((image_id) => {
 export const Home = ({ is_selected }) => {
   const [canvas, set_canvas] = useState(null)
   const [context, set_context] = useState(null)
+  const [export_canvas, set_export_canvas] = useState(null)
+  const [export_context, set_export_context] = useState(null)
+
   const [source_image, set_source_image] = useState()
   const [inc_index, set_inc_index] = useState(0)
 
@@ -30,6 +33,64 @@ export const Home = ({ is_selected }) => {
   const is_oversized = canvas_width > window.innerWidth
   const canvas_filter = `saturate(${saturation}%) hue-rotate(${hue}deg) invert(${invert}%) brightness(${brightness}%)`
 
+  const render_canvas = (inc_index) => {
+    const img = new Image()
+    img.onload = () => {
+      // draw the source image to get its pixels data
+      const ratio = img.height / img.width
+      const target_width = patterns_per_line
+      const target_height = Math.floor(target_width * ratio)
+      const img_dimensions = [0, 0, img.width, img.height]
+      const target_dimensions = [0, 0, target_width, target_height]
+      canvas.width = target_width
+      canvas.height = target_height
+      context.drawImage(img, ...img_dimensions, ...target_dimensions)
+      const pixels = context.getImageData(...target_dimensions).data
+
+      // shuffle the images if the user hovered the shuffling stripe
+      const shuffled_images = [
+        ...images.slice(inc_index, images.length),
+        ...images.slice(0, inc_index),
+      ]
+
+      // match an image pattern to each pixel according to its greyscale value
+      let patterns = []
+      const chunk_size = 4
+      for (let i = 0; i < pixels.length; i += chunk_size) {
+        const [red, green, blue] = pixels.slice(i, i + chunk_size)
+        const grey = Math.floor((red + green + blue) / 3)
+        const index = Math.floor(grey / (255 / images_ids.length)) - 1
+        const matching_pattern = shuffled_images.at(index)
+        patterns.push(matching_pattern)
+      }
+
+      // set canvas size to fit the render parameters
+      canvas.width = pattern_size * patterns_per_line
+      canvas.height = pattern_size * (patterns.length / patterns_per_line)
+
+      // clear the source image
+      context.clearRect(0, 0, canvas.width, canvas.height)
+
+      // draw the patterned image with image pool images on the render
+      // 1. per each line of the image
+      for (let i = 0; i < patterns.length; i += patterns_per_line) {
+        const line = patterns.slice(i, i + patterns_per_line)
+        const line_index = i / patterns_per_line
+
+        // 2. per each pattern of the line
+        for (const [pattern_index, pattern] of line.entries()) {
+          // find matching image from the preloaded images array
+          const x = pattern_index * pattern_size
+          const y = line_index * pattern_size
+          const width = pattern_size
+          const height = pattern_size
+          context.drawImage(pattern, x, y, width, height)
+        }
+      }
+    }
+    img.src = source_image
+  }
+
   useEffect(() => {
     if (!canvas) return
     const context = canvas.getContext('2d', { willReadFrequently: true })
@@ -37,71 +98,16 @@ export const Home = ({ is_selected }) => {
   }, [canvas])
 
   useEffect(() => {
+    if (!export_canvas) return
+    const export_context = export_canvas.getContext('2d', {
+      willReadFrequently: true,
+    })
+    set_export_context(export_context)
+  }, [export_canvas])
+
+  useEffect(() => {
     if (!context) return
-
-    const render_image = () => {
-      const img = new Image()
-      img.onload = () => {
-        // draw the source image to get its pixels data
-        const ratio = img.height / img.width
-        const target_width = patterns_per_line
-        const target_height = Math.floor(target_width * ratio)
-        const img_dimensions = [0, 0, img.width, img.height]
-        const target_dimensions = [0, 0, target_width, target_height]
-        canvas.width = target_width
-        canvas.height = target_height
-        context.drawImage(img, ...img_dimensions, ...target_dimensions)
-        const pixels = context.getImageData(...target_dimensions).data
-
-        // shuffle the images if the user hovered the shuffling stripe
-        const shuffled_images = [
-          ...images.slice(inc_index, images.length),
-          ...images.slice(0, inc_index),
-        ]
-
-        // match an image pattern to each pixel according to its greyscale value
-        let patterns = []
-        const chunk_size = 4
-        for (let i = 0; i < pixels.length; i += chunk_size) {
-          const [red, green, blue] = pixels.slice(i, i + chunk_size)
-          const grey = Math.floor((red + green + blue) / 3)
-          const index = Math.floor(grey / (255 / images_ids.length)) - 1
-          const matching_pattern = shuffled_images.at(index)
-          patterns.push(matching_pattern)
-        }
-
-        // set canvas size to fit the render parameters
-        canvas.width = pattern_size * patterns_per_line
-        canvas.height = pattern_size * (patterns.length / patterns_per_line)
-
-        // clear the source image
-        context.clearRect(0, 0, canvas.width, canvas.height)
-
-        // draw the patterned image with image pool images on the render
-        // 1. per each line of the image
-        for (let i = 0; i < patterns.length; i += patterns_per_line) {
-          const line = patterns.slice(i, i + patterns_per_line)
-          const line_index = i / patterns_per_line
-
-          // 2. per each pattern of the line
-          for (const [pattern_index, pattern] of line.entries()) {
-            // find matching image from the preloaded images array
-            const x = pattern_index * pattern_size
-            const y = line_index * pattern_size
-            const width = pattern_size
-            const height = pattern_size
-            context.drawImage(pattern, x, y, width, height)
-          }
-        }
-
-        // add feature to download final render (apply filters and redraw before downloading)
-        // context.filter = canvas_filter
-        // context.drawImage(canvas, 0, 0)
-      }
-      img.src = source_image
-    }
-
-    render_image()
+    render_canvas(inc_index)
   }, [
     canvas,
     context,
@@ -134,6 +140,7 @@ export const Home = ({ is_selected }) => {
   return (
     <Wrapper ai_center={!is_oversized} jc_center={!is_oversized}>
       <Canvas style={{ filter: canvas_filter }} elemRef={set_canvas} />
+      <ExportCanvas hidden elemRef={set_export_canvas} />
 
       <Settings
         settings={{
@@ -155,6 +162,13 @@ export const Home = ({ is_selected }) => {
       />
 
       <ShufflingStripe inc_index={inc_index} set_inc_index={set_inc_index} />
+
+      <Downloads
+        canvases={{ canvas, export_canvas }}
+        export_context={export_context}
+        render_canvas={render_canvas}
+        filter={canvas_filter}
+      />
     </Wrapper>
   )
 }
@@ -282,6 +296,77 @@ const ShufflingStripe = ({ inc_index, set_inc_index }) => (
   </ShufflingWrapper>
 )
 
+const Downloads = ({ canvases, export_context, render_canvas, filter }) => {
+  const { canvas, export_canvas } = canvases
+  return (
+    <DownloadButtons>
+      <DownloadButton
+        onClick={() => {
+          export_canvas.width = canvas.width
+          export_canvas.height = canvas.height
+          export_context.filter = filter
+          export_context.drawImage(canvas, 0, 0)
+
+          const link = document.createElement('a')
+          const image = export_canvas
+            .toDataURL('image/png')
+            .replace('image/png', 'image/octet-stream')
+          link.href = image
+          link.download = 'canvas.png'
+          link.click()
+          link.remove()
+        }}
+      >
+        Download image
+      </DownloadButton>
+
+      <DownloadButton
+        t30
+        onClick={() => {
+          const timer = 100
+          let index = 0
+
+          const canvas_stream = export_canvas.captureStream() // capture stream from canvas
+          const recorder = new MediaRecorder(canvas_stream) // init the recorder
+          const media_chunks = [] // store the recorded media chunks (blobs)
+
+          const animate_canvas = () => {
+            render_canvas(index)
+            export_canvas.width = canvas.width
+            export_canvas.height = canvas.height
+            export_context.filter = filter
+            export_context.drawImage(canvas, 0, 0)
+            index++
+            if (index === images.length) {
+              // stop recording when all images have been displayed
+              recorder.stop()
+              return
+            }
+            setTimeout(animate_canvas, timer)
+          }
+
+          // start recording
+          recorder.start()
+          animate_canvas()
+          // store new data made available by the recorder
+          recorder.ondataavailable = ({ data }) => media_chunks.push(data)
+          // once the recorder stops, make a complete blob from all the chunks
+          recorder.onstop = () => {
+            const blob = new Blob(media_chunks, { type: 'video/mp4' })
+            const link = document.createElement('a')
+            link.href = URL.createObjectURL(blob)
+            link.download = 'canvas-animated'
+            link.click()
+            link.remove()
+          }
+        }}
+      >
+        Download video
+      </DownloadButton>
+    </DownloadButtons>
+  )
+}
+
 // control panel
 const Controls =
   Component.fixed.flex.flex_column.ai_flex_start.zi10.t30.l30.bg_white.pa20.ba.b_rad10.div()
@@ -310,5 +395,10 @@ const Dot = Component.mb15.h7.w7.bg_black.b_rad50p.div()
 // render
 const Wrapper = Component.flex.w100vw.min_h100vh.div()
 const Canvas = Component.canvas()
+const ExportCanvas = Component.fixed.t0.canvas()
+
+// downloads
+const DownloadButtons = Component.fixed.t30.r30.flex.flex_column.div()
+const DownloadButton = Component.bg_white.ba.ph15.pv5.b_rad20.fs14.mb10.button()
 
 export default Home
