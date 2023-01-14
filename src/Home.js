@@ -35,7 +35,8 @@ export const Home = ({ is_selected }) => {
   const [hue, set_hue] = useState(0)
 
   const canvas_width = patterns_per_line * pattern_size
-  const is_oversized = canvas_width > window.innerWidth
+  const is_oversized_w = canvas_width > window.innerWidth
+  const is_oversized_h = canvas?.height > window.innerHeight
   const canvas_filter = `saturate(${saturation}%) hue-rotate(${hue}deg) invert(${invert}%) brightness(${brightness}%)`
 
   const render_canvas = (inc_index) => {
@@ -126,28 +127,28 @@ export const Home = ({ is_selected }) => {
   // a file input is displayed to updload one
   if (!source_image) {
     return (
-      <UploadLabel>
-        <UploadLabelButton fs30 b_rad100 pv20 ph40 bw2>
-          Hello hello! To get started, click & import an image...
-        </UploadLabelButton>
-        <UploadInput
-          type="file"
-          onChange={(event) => {
-            const reader = new FileReader()
-            reader.onload = (event) => set_source_image(event.target.result)
-            reader.readAsDataURL(event.target.files[0])
-          }}
-        />
-      </UploadLabel>
+      <Div w100vw h100vh pa50>
+        <UploadLabel>
+          <UploadLabelButton fs30 fs18__xs bw1__xs b_rad100 pv20 ph40 bw2>
+            Hello hello! To get started, click & import an image...
+          </UploadLabelButton>
+          <UploadInput
+            type="file"
+            accept="image/*"
+            onChange={(event) => {
+              const reader = new FileReader()
+              reader.onload = (event) => set_source_image(event.target.result)
+              reader.readAsDataURL(event.target.files[0])
+            }}
+          />
+        </UploadLabel>
+      </Div>
     )
   }
 
   return (
-    <Wrapper ai_center={!is_oversized} jc_center={!is_oversized}>
-      <Canvas style={{ filter: canvas_filter }} elemRef={set_canvas} />
-      <ExportCanvas hidden elemRef={set_export_canvas} />
-
-      <Settings
+    <Fragment>
+      <Controls
         settings={{
           patterns_per_line,
           pattern_size,
@@ -164,30 +165,69 @@ export const Home = ({ is_selected }) => {
           set_invert,
           set_hue,
         }}
+        downloads={{
+          canvases: { canvas, export_canvas, export_context },
+          canvas_filter,
+          render_canvas,
+          set_loading,
+        }}
       />
 
       <ShufflingStripe inc_index={inc_index} set_inc_index={set_inc_index} />
 
-      <Downloads
-        canvases={{ canvas, export_canvas, export_context }}
-        render_canvas={render_canvas}
-        set_loading={set_loading}
-        filter={canvas_filter}
-      />
-
-      {loading && <Loader>Rendering video</Loader>}
-    </Wrapper>
+      <Wrapper
+        flex={!is_oversized_w || !is_oversized_h}
+        ai_center={!is_oversized_h}
+        jc_center={!is_oversized_w}
+      >
+        <Canvas style={{ filter: canvas_filter }} elemRef={set_canvas} />
+        <ExportCanvas hidden elemRef={set_export_canvas} />
+        {loading && (
+          <LoaderWrapper>
+            <Loader>Rendering video</Loader>
+          </LoaderWrapper>
+        )}
+      </Wrapper>
+    </Fragment>
   )
 }
 
-const Settings = ({ settings }) => {
+const Controls = ({ settings, downloads }) => {
   const [is_open, set_is_open] = useState(true)
 
   return (
-    <Controls w250={is_open}>
+    <Div fixed zi10 t30 l30>
+      <Settings
+        settings={settings}
+        is_open={is_open}
+        set_is_open={set_is_open}
+      />
+
+      <Downloads
+        canvases={downloads.canvases}
+        filter={downloads.canvas_filter}
+        render_canvas={downloads.render_canvas}
+        setters={{ set_loading: downloads.set_loading, set_is_open }}
+      />
+    </Div>
+  )
+}
+
+const Settings = ({ settings, is_open, set_is_open }) => {
+  return (
+    <SettingWrapper
+      pa20={is_open}
+      pv10={!is_open}
+      ph20={!is_open}
+      b_rad100={!is_open}
+      w285={is_open}
+      w250__xs={is_open}
+    >
       <Header onClick={() => set_is_open(!is_open)} mb15={is_open}>
         <div>Settings</div>
-        <Div ml25>{is_open ? '↑' : '↓'}</Div>
+        <Div ml25 fs14__xs>
+          <Arrow direction={is_open ? 'up' : 'down'} />
+        </Div>
       </Header>
       {is_open && (
         <Fragment>
@@ -236,10 +276,11 @@ const Settings = ({ settings }) => {
 
           <ImageUpload>
             <SourceImage src={settings.source_image}></SourceImage>
-            <UploadLabel>
+            <UploadLabel absolute>
               <UploadLabelButton>Try with another image!</UploadLabelButton>
               <UploadInput
                 type="file"
+                accept="image/*"
                 onChange={({ target }) => {
                   const reader = new FileReader()
                   reader.onload = ({ target }) => {
@@ -252,7 +293,7 @@ const Settings = ({ settings }) => {
           </ImageUpload>
         </Fragment>
       )}
-    </Controls>
+    </SettingWrapper>
   )
 }
 
@@ -274,6 +315,21 @@ const Setting = ({ value, set_value, label, ...props }) => {
   )
 }
 
+const Arrow = ({ direction = 'up' }) => (
+  <Svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 130">
+    <path
+      fill="none"
+      stroke="black"
+      strokeWidth={6}
+      d={
+        direction === 'up'
+          ? 'M17.35 55.4 65 7.75l47.65 47.65M65 122.75V8.41'
+          : 'M114.65 73.1 67 120.75 19.35 73.1M67 5.75v114.34'
+      }
+    />
+  </Svg>
+)
+
 const ShufflingStripe = ({ inc_index, set_inc_index }) => (
   <ShufflingWrapper>
     <ShufflingLabel>Shuffling-patterns stripe</ShufflingLabel>
@@ -290,10 +346,11 @@ const ShufflingStripe = ({ inc_index, set_inc_index }) => (
             key={index}
             fs15={is_selected}
             grey5={!is_selected}
+            bg_black_gradient__xs={is_selected}
             onMouseOver={(event) => set_inc_index(index)}
           >
-            {is_selected && <Dot />}
-            <Span mb10={!is_selected} mb8={is_selected}>
+            {is_selected && <Dot none__xs />}
+            <Span none__xs mb10={!is_selected} mb8={is_selected}>
               {index + 1}
             </Span>
           </ShufflingFrame>
@@ -303,8 +360,9 @@ const ShufflingStripe = ({ inc_index, set_inc_index }) => (
   </ShufflingWrapper>
 )
 
-const Downloads = ({ canvases, render_canvas, filter, set_loading }) => {
+const Downloads = ({ canvases, render_canvas, filter, setters }) => {
   const { canvas, export_canvas, export_context } = canvases
+  const { set_is_open, set_loading } = setters
   return (
     <DownloadButtons>
       <DownloadButton
@@ -328,7 +386,6 @@ const Downloads = ({ canvases, render_canvas, filter, set_loading }) => {
       </DownloadButton>
 
       <DownloadButton
-        t30
         onClick={() => {
           const timer = 100
           let index = 0
@@ -355,7 +412,10 @@ const Downloads = ({ canvases, render_canvas, filter, set_loading }) => {
           // start recording
           recorder.start()
           animate_canvas()
+
+          set_is_open(false)
           set_loading(true)
+
           // store new data made available by the recorder
           recorder.ondataavailable = ({ data }) => media_chunks.push(data)
           // once the recorder stops, make a complete blob from all the chunks
@@ -378,22 +438,23 @@ const Downloads = ({ canvases, render_canvas, filter, set_loading }) => {
 }
 
 // control panel
-const Controls =
-  Component.fixed.flex.flex_column.ai_flex_start.zi10.t30.l30.bg_white.pa20.ba.b_rad10.div()
+const SettingWrapper =
+  Component.flex.flex_column.ai_flex_start.bg_white.ba.b_rad10.div()
 const Header =
-  Component.c_pointer.fs13.uppercase.ls3.grey5.flex.jc_between.w100p.div()
-const Parameter = Component.w100p.fs14.mt10.flex.ai_center.div()
-const RangeInput = Component.w105.mr15.input()
+  Component.c_pointer.fs13.fs11__xs.uppercase.ls3.grey5.flex.jc_between.ai_center.w100p.div()
+const Svg = Component.w15.svg()
+const Parameter = Component.w100p.fs14.fs13__xs.mt10.flex.ai_center.div()
+const RangeInput = Component.w100.mr15.input()
 const UploadLabel =
-  Component.black.fs15.w100p.h100p.absolute.flex.ai_center.jc_center.label()
+  Component.black.fs15.fs13__xs.w100p.h100p.flex.ai_center.jc_center.label()
 const UploadLabelButton =
-  Component.ba.b_rad20.b_black.bg_white.bw1.ph25.pv5.span()
+  Component.text_center.ba.b_rad20.b_black.bg_white.bw1.ph25.ph15__xs.pv5.span()
 const ImageUpload = Component.w100p.mt30.relative.flex.ai_center.jc_center.div()
 const UploadInput = Component.o0.w100p.h100p.absolute.c_pointer.input()
 const SourceImage = Component.w100p.min_h100.ba.b_black.img()
 
 // shuffling stripe
-const ShufflingWrapper = Component.w100p.fixed.b0.div()
+const ShufflingWrapper = Component.zi10.w100p.fixed.b0.div()
 const ShufflingLabel =
   Component.pv5.ph10.bg_white.b_rad20.ba.ml30.fs14.grey6.span()
 const ShufflingFrames =
@@ -403,14 +464,16 @@ const ShufflingFrame =
 const Dot = Component.mb15.h7.w7.bg_black.b_rad50p.div()
 
 // render
-const Wrapper = Component.flex.w100vw.min_h100vh.div()
+const Wrapper = Component.w100vw.h100vh.of_scroll.div()
 const Canvas = Component.canvas()
 const ExportCanvas = Component.fixed.t0.canvas()
 
 // downloads
-const DownloadButtons = Component.fixed.t30.r30.flex.flex_column.div()
-const DownloadButton = Component.bg_white.ba.ph15.pv5.b_rad20.fs14.mb10.button()
-const Loader =
-  Component.fixed.bg_white.fs20.ph20.pv10.ba.b_rad100.shadow_a_l.div()
+const DownloadButtons = Component.w100p.flex.flex_column.div()
+const DownloadButton =
+  Component.c_pointer.mt_1.bg_white.ba.ph15.pv10.b_rad20.fs14.fs13__xs.button()
+const LoaderWrapper =
+  Component.zi10.t0.fixed.w100p.h100p.flex.ai_center.jc_center.div()
+const Loader = Component.bg_white.fs20.ph20.pv10.ba.b_rad100.shadow_a_l.div()
 
 export default Home
